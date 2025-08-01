@@ -77,7 +77,10 @@ def get_curl_formatted():
     parts = shlex.split(s)
     output = parts[0] + " \\\n"
     next_cmd = False
+    last_opt = None
     markdown_table = ""
+
+    data_opts = {"-d", "--data", "--data-raw", "--data-binary", "--data-urlencode"}
 
     for s in parts[1:]:
         parsed_url = urlparse(s)
@@ -87,14 +90,20 @@ def get_curl_formatted():
             s = unquote(s)
 
         if next_cmd:
+            # Normalize payload newlines for curl -d/--data... arguments
+            if last_opt in data_opts:
+                s = s.replace("\\x0a", "\n").replace("\\n", "\n")
             output += "'" + s + "' \\\n"
             next_cmd = False
+            last_opt = None
         elif s.startswith("--"):
             output += "   " + s + " \\\n"
-            next_cmd = False
+            next_cmd = True
+            last_opt = s
         elif s.startswith("-"):
             output += "   " + s + " "
             next_cmd = True
+            last_opt = s
         else:
             # pass -g for the unescaped URL so the curl can be executed in the
             # terminal
@@ -120,6 +129,7 @@ def get_curl_formatted():
                 markdown_table += '</details>'
 
             next_cmd = False
+            last_opt = None
 
     output = output.strip()
     if output.endswith("\\"):
